@@ -325,8 +325,9 @@ bool Tester::waitFootprint(
   std::vector<nav2_collision_monitor::Point> & footprint)
 {
   rclcpp::Time start_time = test_node_->now();
+  nav2_collision_monitor::Velocity vel{0.0, 0.0, 0.0};
   while (rclcpp::ok() && test_node_->now() - start_time <= rclcpp::Duration(timeout)) {
-    polygon_->updatePolygon();
+    polygon_->updatePolygon(vel);
     polygon_->getPolygon(footprint);
     if (footprint.size() > 0) {
       return true;
@@ -488,7 +489,77 @@ TEST_F(Tester, testCircleUndeclaredRadius)
 
 TEST_F(Tester, testPolygonUpdate)
 {
-  createPolygon("approach");
+  createPolygon("stop", false);
+
+  std::vector<nav2_collision_monitor::Point> poly;
+  polygon_->getPolygon(poly);
+  ASSERT_FALSE(polygon_->isShapeSet());
+  ASSERT_EQ(poly.size(), 0u);
+
+  // Publish incorrect shape and check that polygon was not updated
+  test_node_->publishPolygon(BASE_FRAME_ID, false);
+  ASSERT_FALSE(waitPolygon(100ms, poly));
+  ASSERT_FALSE(polygon_->isShapeSet());
+
+  // Publush correct polygon and make shure that it was set correctly
+  test_node_->publishPolygon(BASE_FRAME_ID, true);
+  ASSERT_TRUE(waitPolygon(500ms, poly));
+  ASSERT_TRUE(polygon_->isShapeSet());
+  ASSERT_EQ(poly.size(), 4u);
+  EXPECT_NEAR(poly[0].x, SQUARE_POLYGON[0], EPSILON);
+  EXPECT_NEAR(poly[0].y, SQUARE_POLYGON[1], EPSILON);
+  EXPECT_NEAR(poly[1].x, SQUARE_POLYGON[2], EPSILON);
+  EXPECT_NEAR(poly[1].y, SQUARE_POLYGON[3], EPSILON);
+  EXPECT_NEAR(poly[2].x, SQUARE_POLYGON[4], EPSILON);
+  EXPECT_NEAR(poly[2].y, SQUARE_POLYGON[5], EPSILON);
+  EXPECT_NEAR(poly[3].x, SQUARE_POLYGON[6], EPSILON);
+  EXPECT_NEAR(poly[3].y, SQUARE_POLYGON[7], EPSILON);
+}
+
+TEST_F(Tester, testPolygonTopicUpdateDifferentFrame)
+{
+  createPolygon("stop", false);
+  sendTransforms(0.1);
+
+  std::vector<nav2_collision_monitor::Point> poly;
+  polygon_->getPolygon(poly);
+  ASSERT_EQ(poly.size(), 0u);
+
+  // Publush polygon in different frame and make shure that it was set correctly
+  test_node_->publishPolygon(BASE2_FRAME_ID, true);
+  ASSERT_TRUE(waitPolygon(500ms, poly));
+  ASSERT_EQ(poly.size(), 4u);
+  EXPECT_NEAR(poly[0].x, SQUARE_POLYGON[0] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[0].y, SQUARE_POLYGON[1] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[1].x, SQUARE_POLYGON[2] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[1].y, SQUARE_POLYGON[3] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[2].x, SQUARE_POLYGON[4] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[2].y, SQUARE_POLYGON[5] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[3].x, SQUARE_POLYGON[6] + 0.1, EPSILON);
+  EXPECT_NEAR(poly[3].y, SQUARE_POLYGON[7] + 0.1, EPSILON);
+
+  // Move BASE2_FRAME_ID to 0.2 m away from BASE_FRAME_ID
+  sendTransforms(0.2);
+  // updatePolygon(vel) should update poly coordinates to correct ones in BASE_FRAME_ID
+  nav2_collision_monitor::Velocity vel{0.0, 0.0, 0.0};
+  polygon_->updatePolygon(vel);
+  // Check that polygon coordinates were updated correctly
+  ASSERT_TRUE(waitPolygon(500ms, poly));
+  ASSERT_EQ(poly.size(), 4u);
+  EXPECT_NEAR(poly[0].x, SQUARE_POLYGON[0] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[0].y, SQUARE_POLYGON[1] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[1].x, SQUARE_POLYGON[2] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[1].y, SQUARE_POLYGON[3] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[2].x, SQUARE_POLYGON[4] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[2].y, SQUARE_POLYGON[5] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[3].x, SQUARE_POLYGON[6] + 0.2, EPSILON);
+  EXPECT_NEAR(poly[3].y, SQUARE_POLYGON[7] + 0.2, EPSILON);
+}
+
+TEST_F(Tester, testPolygonTopicUpdateIncorrectFrame)
+{
+  createPolygon("stop", false);
+  sendTransforms(0.1);
 
   std::vector<nav2_collision_monitor::Point> poly;
   polygon_->getPolygon(poly);

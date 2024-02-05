@@ -139,7 +139,16 @@ void Polygon::getPolygon(std::vector<Point> & poly) const
   poly = poly_;
 }
 
-void Polygon::updatePolygon()
+bool Polygon::isShapeSet()
+{
+  if (poly_.empty()) {
+    RCLCPP_WARN(logger_, "[%s]: Polygon shape is not set yet", polygon_name_.c_str());
+    return false;
+  }
+  return true;
+}
+
+void Polygon::updatePolygon(const Velocity & /*cmd_vel_in*/)
 {
   if (footprint_sub_ != nullptr) {
     // Get latest robot footprint from footprint subscriber
