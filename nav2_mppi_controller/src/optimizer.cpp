@@ -411,6 +411,8 @@ void Optimizer::setMotionModel(const std::string & model)
     motion_model_ = std::make_shared<OmniMotionModel>();
   } else if (model == "Ackermann") {
     motion_model_ = std::make_shared<AckermannMotionModel>(parameters_handler_, name_);
+  } else if (model == "Swerve") {
+    motion_model_ = std::make_shared<SwerveModel>(parameters_handler_, name_);
   } else {
     throw std::runtime_error(
             std::string(
