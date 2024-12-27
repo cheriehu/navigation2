@@ -53,23 +53,9 @@ add_library(${library_name} SHARED
   src/range.cpp
   src/kinematics.cpp
 )
-add_library(${detector_library_name} SHARED
-  src/collision_detector_node.cpp
-  src/polygon.cpp
-  src/velocity_polygon.cpp
-  src/circle.cpp
-  src/source.cpp
-  src/scan.cpp
-  src/pointcloud.cpp
-  src/range.cpp
-  src/kinematics.cpp
-)
 
 add_executable(${monitor_executable_name}
   src/collision_monitor_main.cpp
-)
-add_executable(${detector_executable_name}
-  src/collision_detector_main.cpp
 )
 
 ament_target_dependencies(${library_name}
