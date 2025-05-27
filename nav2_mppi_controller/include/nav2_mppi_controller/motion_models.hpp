@@ -170,6 +170,65 @@ public:
   }
 };
 
+class SwerveModel : public MotionModel
+{
+public:
+  explicit SwerveModel(ParametersHandler * param_handler, const std::string & name)
+  {
+    auto getParam = param_handler->getParamGetter(name + ".SwerveModelConstraints");
+    getParam(min_turning_r_, "min_turning_r", 0.2);
+    // getParam(vx_threshold_, "vx_threshold", 0.05);
+    // getParam(vy_threshold_, "vy_threshold", 0.05);
+    // getParam(wz_threshold_, "wz_threshold", 0.05);
+  }
+
+  bool isHolonomic() override { return true; }
+
+  void applyConstraints(models::ControlSequence & control_sequence) override
+  {
+    auto & vx = control_sequence.vx;
+    auto & vy = control_sequence.vy;
+    auto & wz = control_sequence.wz;
+    float zero_threshold = 0.05;
+    // Modified logic:
+    // Instead of simply setting wz = 0 if vy != 0, we now compare magnitudes.
+    // If wz > vy, set vy = 0, else set wz = 0 (for all instances where vy != 0).
+    {
+      auto parallel_mask = (xt::fabs(vy) >= zero_threshold);
+      auto wz_greater_mask = parallel_mask & (xt::fabs(wz) > xt::fabs(vy));
+      auto vy_greater_mask = parallel_mask & (xt::fabs(wz) <= xt::fabs(vy));
+
+      // If wz > vy, vy = 0
+      xt::masked_view(vy, wz_greater_mask) = 0.0;
+      // Else wz = 0
+      xt::masked_view(wz, vy_greater_mask) = 0.0;
+    }
+
+    // The remainder of the logic for pure rotation / dual ackermann stays the same
+    {
+      auto vy_zero = (xt::fabs(vy) < zero_threshold);
+
+      // Consider only those where wz != 0 for rotation modes
+      auto rotating_mask = vy_zero & xt::not_equal(wz, 0.0);
+
+      // Compute ratio |vx/wz|
+      auto ratio = xt::eval(xt::fabs(vx) / (xt::fabs(wz) + 1e-9)); // small epsilon to avoid division by zero
+
+      // Pure rotation mode: |vx/wz| < min_turning_r => vx=0
+      auto pure_rot_mask = rotating_mask & (ratio < min_turning_r_);
+      xt::masked_view(vx, pure_rot_mask) = 0.0;
+
+      // Dual ackermann and straight line modes require no further changes here
+    }
+  }
+
+private:
+  float min_turning_r_{0.2};
+  // float vx_threshold_{0.05};
+  // float vy_threshold_{0.05};
+  // float wz_threshold_{0.05};
+};
+
 }  // namespace mppi
 
 #endif  // NAV2_MPPI_CONTROLLER__MOTION_MODELS_HPP_
